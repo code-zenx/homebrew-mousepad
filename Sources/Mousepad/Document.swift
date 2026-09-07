@@ -28,10 +28,12 @@ final class Document: NSDocument {
     var languageID = Languages.plainText.id
     var userSetLanguage = false
     private var undecodable: Data?
+    /// The window currently showing this document as a tab, and the editor that lives in it.
     weak var wc: DocumentWindowController?
+    var pane: EditorPane?
 
     var language: Language { Languages.language(id: languageID) ?? Languages.plainText }
-    var currentText: String { wc?.textView.string ?? text }
+    var currentText: String { pane?.textView.string ?? text }
 
     override class var autosavesInPlace: Bool { false }
     override class var readableTypes: [String] { ["public.plain-text", "public.text", "public.source-code", "public.data"] }
@@ -45,13 +47,42 @@ final class Document: NSDocument {
     // MARK: - Window
 
     override func makeWindowControllers() {
-        let c = DocumentWindowController(document: self)
-        addWindowController(c)
-        wc = c
-        c.applyAll()
-        c.loadTextFromDocument()
+        let host = AppState.separateNextWindow ? nil : DocumentWindowController.front
+        AppState.separateNextWindow = false
+        (host ?? DocumentWindowController()).add(self)   // add() attaches the window controller
         if undecodable != nil { DispatchQueue.main.async { self.promptForEncoding() } }
     }
+
+    // MARK: - Tab plumbing
+
+    /// Detach from the host first: NSDocument.close() would otherwise close the whole window.
+    override func close() {
+        wc?.remove(self)
+        super.close()
+    }
+
+    override func showWindows() {
+        wc?.show(self)
+        super.showWindows()
+    }
+
+    /// Sheets (save, revert, close prompts) bring the tab forward first.
+    override var windowForSheet: NSWindow? {
+        wc?.show(self)
+        return wc?.window
+    }
+
+    override func updateChangeCount(_ change: NSDocument.ChangeType) {
+        super.updateChangeCount(change)
+        wc?.tabBar.reload()
+    }
+
+    func languageDidChange() {
+        pane?.highlightAll()
+        wc?.updateStatus()
+    }
+
+    func metaDidChange() { wc?.updateStatus() }
 
     // MARK: - Reading and writing
 
@@ -66,7 +97,7 @@ final class Document: NSDocument {
             undecodable = data
         }
         if !userSetLanguage { guessLanguage() }
-        wc?.loadTextFromDocument()   // revert path: the window already exists
+        pane?.loadTextFromDocument()   // revert path: the editor already exists
     }
 
     override func data(ofType typeName: String) throws -> Data {
@@ -78,7 +109,7 @@ final class Document: NSDocument {
         RecentCharsets.remember(meta.encoding, for: url)
         if !userSetLanguage {
             guessLanguage(url: url)
-            wc?.languageDidChange()
+            languageDidChange()
         }
     }
 
@@ -124,9 +155,9 @@ final class Document: NSDocument {
 
     func setTemplate(text t: String, name: String) {
         text = t
-        wc?.loadTextFromDocument()
+        pane?.loadTextFromDocument()
         languageID = Languages.guess(filename: name, firstLine: String(t.prefix { $0 != "\n" })).id
-        wc?.languageDidChange()
+        languageDidChange()
         updateChangeCount(.changeDone)
     }
 
@@ -136,20 +167,20 @@ final class Document: NSDocument {
         guard let id = sender.representedObject as? String else { return }
         languageID = id
         userSetLanguage = true
-        wc?.languageDidChange()
+        languageDidChange()
     }
 
     @objc func setLineEnding(_ sender: NSMenuItem) {
         guard let e = LineEnding(rawValue: sender.tag), e != meta.lineEnding else { return }
         meta.lineEnding = e
         updateChangeCount(.changeDone)
-        wc?.metaDidChange()
+        metaDidChange()
     }
 
     @objc func toggleBOM(_ sender: Any?) {
         meta.writeBOM.toggle()
         updateChangeCount(.changeDone)
-        wc?.metaDidChange()
+        metaDidChange()
     }
 
     @objc func setEncoding(_ sender: NSMenuItem) {
@@ -159,7 +190,7 @@ final class Document: NSDocument {
         meta.encoding = e
         if !Encodings.isUnicode(e) { meta.writeBOM = false }
         updateChangeCount(.changeDone)
-        wc?.metaDidChange()
+        metaDidChange()
     }
 
     override func validateMenuItem(_ item: NSMenuItem) -> Bool {
@@ -185,7 +216,7 @@ final class Document: NSDocument {
     private var encodingPreview: NSTextField?
 
     func promptForEncoding(error: String? = nil) {
-        guard let data = undecodable, let window = wc?.window else { return }
+        guard let data = undecodable, let window = windowForSheet else { return }
         let alert = NSAlert()
         alert.messageText = "Not valid \(Encodings.name(for: meta.encoding)) text"
         alert.informativeText = error ?? "Pick the encoding this file was saved with."
@@ -226,8 +257,8 @@ final class Document: NSDocument {
                 self.undecodable = nil
                 RecentCharsets.remember(enc, for: self.fileURL)
                 if !self.userSetLanguage { self.guessLanguage() }
-                self.wc?.loadTextFromDocument()
-                self.wc?.languageDidChange()
+                self.pane?.loadTextFromDocument()
+                self.languageDidChange()
             } catch {
                 DispatchQueue.main.async { self.promptForEncoding(error: error.localizedDescription) }
             }

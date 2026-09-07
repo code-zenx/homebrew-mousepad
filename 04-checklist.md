@@ -163,10 +163,10 @@ Known deliberate gaps: see `ponytail:` comments in source and Phase 10 below.
 - [ ] Tab Size ▸ Other… sheet stores per-document; Preferences stores default
 
 ## Phase 8 — Tabs, templates, print
-- [ ] `window.tabbingMode = .preferred`, `tabbingIdentifier = "mousepad"`; new documents open as tabs
-- [ ] Always show tab bar setting → `window.toggleTabBar` state
-- [ ] Cmd+1…9 select tab; cycle setting affects Next/Previous wrap
-- [ ] Move Tab to New Window (native) confirmed; New Window (Shift+Cmd+N) creates a separate window, not a tab
+- [x] New documents open as tabs in the front window. Own tab model, not AppKit's: `DocumentWindowController` hosts N `Document`s, one `EditorPane` each (AppKit refuses to hide its tab bar once a group has two windows)
+- [ ] Always show tab bar setting (bar is always visible for now)
+- [x] Cmd+1…9 select tab; Next/Previous wrap
+- [x] Move Tab to New Window; New Window (Shift+Cmd+N) creates a separate window, not a tab
 - [ ] Templates: read `~/Templates` (create if missing on first use? no; just show "No templates" disabled item); subfolders → submenus; choosing one → new document with content + guessed language
 - [ ] Page Setup… and Print… via `NSPrintOperation(view: textView)`; header with filename + page N; wrapping on; monospace font
 - [ ] Print settings remembered (`NSPrintInfo.shared`)
@@ -181,7 +181,7 @@ Known deliberate gaps: see `ponytail:` comments in source and Phase 10 below.
 - [ ] README: build steps (`./Scripts/make-app.sh`), first-run Gatekeeper note (right-click → Open)
 
 ## Phase 10 — v1.1
-- [ ] Custom brutalist tab bar (replaces native): 28 pt, panel bg, 1 px borders, active tab accent underline, `*` for modified, close `×` on hover, middle-click close, drag reorder
+- [x] Custom brutalist tab bar (replaces native): 28 pt, panel bg, 1 px borders, active tab accent underline, `*` for modified, close `×` on hover, middle-click close. Drag reorder: not yet
 - [ ] Custom find bar matching `05-ui-style.md` (replaces `NSTextFinder` UI but keeps its engine)
 - [ ] Bundle JetBrains Mono (OFL) in `Resources/Fonts`, register with `CTFontManagerRegisterFontsForURL`
 - [ ] Tree-sitter highlighting via `Neon` + `SwiftTreeSitter` + grammar packages

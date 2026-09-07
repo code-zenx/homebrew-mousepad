@@ -63,7 +63,8 @@ enum MainMenu {
         // AppKit recognises the Open Recent menu by this item and fills it in.
         item(recent, "Clear Menu", #selector(NSDocumentController.clearRecentDocuments(_:)))
         sep(file)
-        item(file, "Close", #selector(NSWindow.performClose(_:)), "w")
+        item(file, "Close", #selector(DocumentWindowController.closeTab(_:)), "w")
+        item(file, "Close Window", #selector(NSWindow.performClose(_:)), "w", [.command, .shift])
         item(file, "Save", #selector(NSDocument.save(_:)), "s")
         item(file, "Save As…", #selector(NSDocument.saveAs(_:)), "s", [.command, .shift])
         item(file, "Save All", #selector(AppDelegate.saveAll(_:)))
@@ -133,13 +134,11 @@ enum MainMenu {
         item(windowMenu, "Minimize", #selector(NSWindow.performMiniaturize(_:)), "m")
         item(windowMenu, "Zoom", #selector(NSWindow.performZoom(_:)))
         sep(windowMenu)
-        item(windowMenu, "Show Previous Tab", #selector(NSWindow.selectPreviousTab(_:)), "[", [.command, .shift])
-        item(windowMenu, "Show Next Tab", #selector(NSWindow.selectNextTab(_:)), "]", [.command, .shift])
+        item(windowMenu, "Show Previous Tab", #selector(DocumentWindowController.previousTab(_:)), "[", [.command, .shift])
+        item(windowMenu, "Show Next Tab", #selector(DocumentWindowController.nextTab(_:)), "]", [.command, .shift])
         let goTab = submenu(windowMenu, "Go to Tab")
-        for n in 1...9 { item(goTab, "Tab \(n)", #selector(AppDelegate.selectTab(_:)), "\(n)", tag: n - 1) }
-        item(windowMenu, "Move Tab to New Window", #selector(NSWindow.moveTabToNewWindow(_:)))
-        item(windowMenu, "Merge All Windows", #selector(NSWindow.mergeAllWindows(_:)))
-        item(windowMenu, "Show Tab Bar", #selector(NSWindow.toggleTabBar(_:)))
+        for n in 1...9 { item(goTab, "Tab \(n)", #selector(DocumentWindowController.selectTab(_:)), "\(n)", tag: n - 1) }
+        item(windowMenu, "Move Tab to New Window", #selector(DocumentWindowController.moveTabToNewWindow(_:)))
         sep(windowMenu)
         item(windowMenu, "Bring All to Front", #selector(NSApplication.arrangeInFront(_:)))
         NSApp.windowsMenu = windowMenu

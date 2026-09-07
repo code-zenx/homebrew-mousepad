@@ -47,9 +47,15 @@ sips -s format png /tmp/win.pdf --out /tmp/win.png
 
 Writes the front window as a PDF and quits. `-wordWrap YES` style arguments override any setting for that run.
 
+```sh
+MOUSEPAD_SMOKE=1 .build/debug/Mousepad a.txt b.txt c.txt
+```
+
+Drives the tab flows that need a live window (switch, edit, undo, new, close, move to new window) and exits 0 or 1.
+
 ## Keys (Cmd unless noted)
 
-New N · Open O · Save S · Save As ⇧S · Close W · Print P · Find F · Next G · Previous ⇧G ·
+New N · Open O · Save S · Save As ⇧S · Close tab W · Close window ⇧W · Print P · Find F · Next G · Previous ⇧G ·
 Replace R · Go to line L · Duplicate line D · Indent ] · Unindent [ · Move line ⌃⌘↑/↓ ·
 Transpose ⌃T · Paste from history ⇧V · Tabs ⇧[ ⇧] and 1…9 · Preferences , · Full screen ⌃F ·
 Home/End smart · Insert key toggles overwrite.

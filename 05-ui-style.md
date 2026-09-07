@@ -2,7 +2,7 @@
 
 Reference look: `plugins.omarchy.org`. Black, monospace, square, one orange accent. Feels like a 1990s terminal app in a window.
 
-Rule of thumb: **if a native control can be restyled, restyle it; if not, keep it native in dark appearance.** Menubar, title bar, alerts, file panels, and (in v1) the tab bar and find bar stay native. Everything inside the document window is ours.
+Rule of thumb: **if a native control can be restyled, restyle it; if not, keep it native in dark appearance.** Menubar, title bar, alerts, file panels, and (in v1) the find bar stays native. Everything inside the document window is ours.
 
 ---
 
@@ -74,8 +74,8 @@ No bold except sheet titles. Italic only for comments. No sans-serif anywhere in
 - Title shows `name` with the native modified dot. Subtitle (macOS 11+) shows full path when the setting is on.
 - No toolbar. Ever.
 
-### Tab bar (v1: native)
-Native tab bar in dark appearance. Accept it. v1.1 custom spec:
+### Tab bar
+Custom, drawn by `TabBarView`. One window hosts many documents; AppKit window tabbing is off.
 
 ```
 ┌ main.swift ──┬ *notes.txt ──┬ Untitled ─────────────────────────────── + ┐
@@ -139,7 +139,7 @@ v1.1 custom spec:
 ### Menus
 Native. Titles per `01` §3. Keep macOS conventions: app menu, Window menu, Help menu. Use `…` for items that open a dialog.
 
-## 5. Full window mock (v1.1 look; v1 has the native tab bar)
+## 5. Full window mock (v1.1 look; v1 has this tab bar and the native find bar)
 
 ```
  ● ● ●   main.swift — ~/code/mousepad/Sources/main.swift

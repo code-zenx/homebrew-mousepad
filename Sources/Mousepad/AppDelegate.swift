@@ -11,12 +11,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSMenu
 
     func applicationWillFinishLaunching(_ n: Notification) {
         Settings.registerDefaults()
+        NSWindow.allowsAutomaticWindowTabbing = false   // our own tab bar; keeps AppKit's tab items out of the Window menu
         NSApp.mainMenu = MainMenu.build(templatesDelegate: self)
     }
 
     func applicationDidFinishLaunching(_ n: Notification) {
         NSApp.activate(ignoringOtherApps: true)
         if let path = ProcessInfo.processInfo.environment["MOUSEPAD_SNAPSHOT"] { snapshot(to: path) }
+        if ProcessInfo.processInfo.environment["MOUSEPAD_SMOKE"] != nil { Smoke.run() }
     }
 
     /// Dev aid: `MOUSEPAD_SNAPSHOT=/tmp/x.png Mousepad.app/Contents/MacOS/Mousepad file.txt`
@@ -34,7 +36,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSMenu
             // PDF, not a bitmap cache: layer-backed scroll views come out blank from cacheDisplay.
             let wc = w.windowController as! DocumentWindowController
             try? v.dataWithPDF(inside: v.bounds).write(to: URL(fileURLWithPath: path))
-            FileHandle.standardError.write("snapshot: wrote \(path) text=\(wc.textView.string.count) chars gutter=\(wc.ruler.frame) clip=\(wc.scrollView.contentView.frame) clipBounds=\(wc.scrollView.contentView.bounds.origin)\n".data(using: .utf8)!)
+            let pane = wc.current?.pane
+            FileHandle.standardError.write("snapshot: wrote \(path) tabs=\(wc.documents.count) text=\(pane?.textView.string.count ?? 0) chars gutter=\(pane?.ruler.frame ?? .zero) clip=\(pane?.scrollView.contentView.frame ?? .zero)\n".data(using: .utf8)!)
             NSApp.terminate(nil)
         }
     }
@@ -102,10 +105,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSMenu
     @objc func fontBigger(_ sender: Any?) { Settings.set(min(72, Settings.int(.fontSize) + 1), .fontSize) }
     @objc func fontSmaller(_ sender: Any?) { Settings.set(max(6, Settings.int(.fontSize) - 1), .fontSize) }
 
-    @objc func selectTab(_ sender: NSMenuItem) {
-        guard let w = NSApp.keyWindow, let tabs = w.tabbedWindows, sender.tag < tabs.count else { NSSound.beep(); return }
-        tabs[sender.tag].makeKeyAndOrderFront(nil)
-    }
+    /// ⌘W when the key window is not a document window (Preferences): plain close.
+    @objc func closeTab(_ sender: Any?) { NSApp.keyWindow?.performClose(sender) }
 
     @objc func showHelp(_ sender: Any?) {
         NSWorkspace.shared.open(URL(string: "https://docs.xfce.org/apps/mousepad/start")!)
@@ -119,8 +120,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSMenu
             item.state = (item.representedObject as? String) == Settings.string(.colorScheme) ? .on : .off
         case #selector(setTabSize(_:)):
             item.state = item.tag == Settings.int(.tabWidth) ? .on : .off
-        case #selector(selectTab(_:)):
-            return (NSApp.keyWindow?.tabbedWindows?.count ?? 0) > item.tag
         default:
             break
         }
