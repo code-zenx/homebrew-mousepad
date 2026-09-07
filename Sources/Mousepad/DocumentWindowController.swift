@@ -111,6 +111,8 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate, NSMe
         synchronizeWindowTitleWithDocumentName()
         updateStatus()
         window?.makeFirstResponder(pane.textView)
+        window?.contentView?.layoutSubtreeIfNeeded()
+        pane.rehighlight()   // a theme change while this tab was hidden could not see its visible range
     }
 
     /// Detaches a document from this window without closing it. `Document.close()` calls this;

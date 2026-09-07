@@ -149,6 +149,17 @@ do {
     ok(!Languages.sections.isEmpty, "sections")
     eq(Languages.language(id: "plain")?.name, "Plain Text")
     ok(Languages.language(id: "nope") == nil, "unknown language")
+    // MARK: LineIndex
+    func starts(_ s: String) -> [Int] { let li = LineIndex(); li.rebuild(s as NSString); return li.starts }
+    eq(starts(""), [0]); eq(starts("a"), [0]); eq(starts("a\n"), [0, 2]); eq(starts("a\nb"), [0, 2])
+    eq(starts("a\r\nb"), [0, 3]); eq(starts("a\rb"), [0, 2]); eq(starts("a\u{2028}b"), [0, 2]); eq(starts("\n\n"), [0, 1, 2])
+    let big = String(repeating: "x", count: 65_535) + "\r\n" + "y\n"
+    eq(starts(big), [0, 65_537, 65_539], "\\r\\n across the chunk boundary")
+    let li = LineIndex()
+    li.rebuild("ab\ncd\n" as NSString)
+    eq(li.starts, [0, 3, 6])
+    eq(li.line(at: 0), 1); eq(li.line(at: 2), 1); eq(li.line(at: 3), 2); eq(li.line(at: 5), 2); eq(li.line(at: 6), 3); eq(li.line(at: 99), 3)
+    eq(li.start(ofLine: 2), 3); eq(li.start(ofLine: 0), 0); eq(li.start(ofLine: 9), 6)
 } catch {
     failures += 1
     print("FAIL threw: \(error)")

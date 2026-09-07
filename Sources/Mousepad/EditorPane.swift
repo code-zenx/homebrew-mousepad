@@ -9,6 +9,7 @@ final class EditorPane: NSObject, NSTextViewDelegate, NSTextStorageDelegate {
     let textView: EditorTextView
     let scrollView = NSScrollView()
     let ruler: LineNumberRuler
+    let lines: LineIndex
     weak var doc: Document?
     /// Text, selection or mode changed; the host refreshes the status bar.
     var onChange: (() -> Void)?
@@ -16,19 +17,22 @@ final class EditorPane: NSObject, NSTextViewDelegate, NSTextStorageDelegate {
     private var theme = Theme.terminal
     private let highlighter = Highlighter()
     private var bracketRanges: [NSRange] = []
-    private var pendingHighlight: NSRange?
+    private var highlightPending = false
 
     init(doc: Document) {
         self.doc = doc
         // Explicit TextKit 1 stack: rulers and highlighting have ten years of examples for it.
         let storage = NSTextStorage()
         let layout = NSLayoutManager()
+        layout.allowsNonContiguousLayout = true   // lay out what is on screen; a 20 MB file must not wait for every glyph
         let container = NSTextContainer(size: NSSize(width: 0, height: CGFloat.greatestFiniteMagnitude))
         container.widthTracksTextView = true
         layout.addTextContainer(container)
         storage.addLayoutManager(layout)
         textView = EditorTextView(frame: NSRect(x: 0, y: 0, width: 800, height: 500), textContainer: container)
-        ruler = LineNumberRuler(textView: textView)
+        let index = LineIndex()
+        lines = index
+        ruler = LineNumberRuler(textView: textView, lines: index)
         super.init()
         buildViews()
     }
@@ -84,7 +88,10 @@ final class EditorPane: NSObject, NSTextViewDelegate, NSTextStorageDelegate {
         NotificationCenter.default.addObserver(self, selector: #selector(scrolled), name: NSView.boundsDidChangeNotification, object: scrollView.contentView)
     }
 
-    @objc private func scrolled() { ruler.needsDisplay = true }
+    @objc private func scrolled() {
+        ruler.needsDisplay = true
+        if (textView.textStorage?.length ?? 0) >= Self.wholeDocumentLimit { scheduleHighlight() }   // new screens came into view
+    }
 
     // MARK: - Document <-> view
 
@@ -93,7 +100,7 @@ final class EditorPane: NSObject, NSTextViewDelegate, NSTextStorageDelegate {
         textView.setSelectedRange(NSRange(location: 0, length: 0))
         textView.scroll(.zero)
         doc?.undoManager?.removeAllActions()
-        highlightAll()
+        rehighlight()
         ruler.updateThickness()
         ruler.needsDisplay = true
         onChange?()
@@ -124,7 +131,7 @@ final class EditorPane: NSObject, NSTextViewDelegate, NSTextStorageDelegate {
         ruler.updateThickness()
         ruler.visible = Settings.bool(.showLineNumbers)
         setWordWrap(Settings.bool(.wordWrap))
-        highlightAll()
+        rehighlight()
         textView.needsDisplay = true
     }
 
@@ -150,32 +157,44 @@ final class EditorPane: NSObject, NSTextViewDelegate, NSTextStorageDelegate {
 
     func textStorage(_ storage: NSTextStorage, didProcessEditing mask: NSTextStorageEditActions, range: NSRange, changeInLength delta: Int) {
         guard mask.contains(.editedCharacters) else { return }
-        // ponytail: whole-document rescan below 64 KB, else the touched paragraph only.
-        let target = storage.length < 65_536
-            ? NSRange(location: 0, length: storage.length)
-            : (storage.string as NSString).paragraphRange(for: range)
-        scheduleHighlight(target)
+        lines.rebuild(storage.string as NSString)
+        scheduleHighlight()
         ruler.updateThickness()
         ruler.needsDisplay = true
         onChange?()
     }
 
-    private func scheduleHighlight(_ r: NSRange) {
-        pendingHighlight = pendingHighlight.map { NSUnionRange($0, r) } ?? r
+    /// Below this many UTF-16 units the whole document is rescanned on every edit, which keeps
+    /// block comments right. Above it only the screens around the visible one are highlighted.
+    static let wholeDocumentLimit = 65_536
+
+    // ponytail: for big files a block comment opened off-screen goes stale until it scrolls into
+    // the window. Upgrade path: tree-sitter via Neon.
+    private func highlightTarget() -> NSRange {
+        guard let storage = textView.textStorage, let lm = textView.layoutManager, let tc = textView.textContainer else { return NSRange(location: 0, length: 0) }
+        if storage.length < Self.wholeDocumentLimit { return NSRange(location: 0, length: storage.length) }
+        var r = textView.visibleRect
+        r.origin.y -= r.height
+        r.size.height *= 3
+        let glyphs = lm.glyphRange(forBoundingRect: r, in: tc)
+        return (storage.string as NSString).paragraphRange(for: lm.characterRange(forGlyphRange: glyphs, actualGlyphRange: nil))
+    }
+
+    /// Coalesces to one pass per run-loop turn; the target is computed then, once layout is settled.
+    private func scheduleHighlight() {
+        guard !highlightPending else { return }
+        highlightPending = true
         DispatchQueue.main.async { [weak self] in
-            guard let self, let r = self.pendingHighlight else { return }
-            self.pendingHighlight = nil
-            self.highlight(range: r)
+            guard let self else { return }
+            self.highlightPending = false
+            self.highlight(range: self.highlightTarget())
         }
     }
 
-    func highlightAll() {
-        guard let s = textView.textStorage else { return }
-        highlight(range: NSRange(location: 0, length: s.length))
-    }
+    func rehighlight() { highlight(range: highlightTarget()) }
 
     private func highlight(range: NSRange) {
-        guard let storage = textView.textStorage, storage.length <= 2_000_000 else { return }
+        guard let storage = textView.textStorage else { return }
         let r = NSIntersectionRange(range, NSRange(location: 0, length: storage.length))
         guard r.length > 0 else { return }
         let t = theme
@@ -199,13 +218,9 @@ final class EditorPane: NSObject, NSTextViewDelegate, NSTextStorageDelegate {
 
     func undoManager(for view: NSTextView) -> UndoManager? { doc?.undoManager }
 
-    // ponytail: O(n) per caret move. Fine below ~1 MB; cache line starts if it ever lags.
     func lineAndColumn(_ loc: Int) -> (Int, Int) {
-        let ns = textView.string as NSString
-        var line = 1
-        for b in ns.substring(to: min(loc, ns.length)).utf8 where b == 10 { line += 1 }
-        let lineStart = ns.lineRange(for: NSRange(location: min(loc, ns.length), length: 0)).location
-        return (line, loc - lineStart + 1)
+        let line = lines.line(at: loc)
+        return (line, loc - lines.start(ofLine: line) + 1)
     }
 
     private func matchBrackets() {
@@ -247,13 +262,7 @@ final class EditorPane: NSObject, NSTextViewDelegate, NSTextStorageDelegate {
 
     func jump(line: Int, column: Int) {
         let ns = textView.string as NSString
-        var loc = 0
-        var n = 1
-        while n < line, loc < ns.length {
-            if ns.character(at: loc) == 10 { n += 1 }
-            loc += 1
-        }
-        let lr = ns.lineRange(for: NSRange(location: min(loc, ns.length), length: 0))
+        let lr = ns.lineRange(for: NSRange(location: min(lines.start(ofLine: line), ns.length), length: 0))
         var lineLen = lr.length
         if lineLen > 0, ns.character(at: NSMaxRange(lr) - 1) == 10 { lineLen -= 1 }
         let target = lr.location + min(max(column - 1, 0), lineLen)

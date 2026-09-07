@@ -78,7 +78,7 @@ final class Document: NSDocument {
     }
 
     func languageDidChange() {
-        pane?.highlightAll()
+        pane?.rehighlight()
         wc?.updateStatus()
     }
 

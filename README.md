@@ -45,7 +45,7 @@ MOUSEPAD_SNAPSHOT=/tmp/win.pdf .build/debug/Mousepad file.swift
 sips -s format png /tmp/win.pdf --out /tmp/win.png
 ```
 
-Writes the front window as a PDF and quits. `-wordWrap YES` style arguments override any setting for that run.
+Writes the front window as a PDF and quits. `MOUSEPAD_GOTO=1200` jumps to that line first. `-wordWrap YES` style arguments override any setting for that run.
 
 ```sh
 MOUSEPAD_SMOKE=1 .build/debug/Mousepad a.txt b.txt c.txt

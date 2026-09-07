@@ -32,6 +32,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSMenu
                 return
             }
             w.makeKeyAndOrderFront(nil)
+            if let line = ProcessInfo.processInfo.environment["MOUSEPAD_GOTO"].flatMap(Int.init) {
+                (w.windowController as? DocumentWindowController)?.current?.pane?.jump(line: line, column: 1)
+            }
             w.displayIfNeeded()
             // PDF, not a bitmap cache: layer-backed scroll views come out blank from cacheDisplay.
             let wc = w.windowController as! DocumentWindowController

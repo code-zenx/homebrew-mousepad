@@ -1,10 +1,12 @@
 import AppKit
+import MousepadCore
 
 /// Line-number gutter. A plain view placed beside the scroll view, not an NSRulerView:
 /// modern NSScrollView overlays rulers on the clip view, which hides column 0 of a
 /// horizontally scrolling document. A sibling view has no such surprise.
 final class LineNumberRuler: NSView {
     unowned let textView: EditorTextView
+    let lines: LineIndex
     var theme = Theme.terminal {
         didSet { needsDisplay = true }
     }
@@ -16,8 +18,9 @@ final class LineNumberRuler: NSView {
     }
     private var thickness: CGFloat = 40
 
-    init(textView: EditorTextView) {
+    init(textView: EditorTextView, lines: LineIndex) {
         self.textView = textView
+        self.lines = lines
         super.init(frame: .zero)
         setContentHuggingPriority(.required, for: .horizontal)
         setContentCompressionResistancePriority(.required, for: .horizontal)
@@ -35,9 +38,7 @@ final class LineNumberRuler: NSView {
 
     /// Call when the text changes. Widens the gutter as the line count grows.
     func updateThickness() {
-        var n = 1
-        for b in textView.string.utf8 where b == 10 { n += 1 }
-        let digits = max(2, String(n).count)
+        let digits = max(2, String(lines.count).count)
         let w = ("0" as NSString).size(withAttributes: [.font: font]).width
         let t = ceil(CGFloat(digits) * w + 16)
         if abs(t - thickness) > 0.5 {
@@ -59,9 +60,9 @@ final class LineNumberRuler: NSView {
         let inset = textView.textContainerInset.height
         let glyphRange = lm.glyphRange(forBoundingRect: visibleRect, in: tc)
         let charRange = lm.characterRange(forGlyphRange: glyphRange, actualGlyphRange: nil)
-        let caretLine = lineNumber(at: textView.selectedRange().location, ns)
+        let caretLine = lines.line(at: textView.selectedRange().location)
 
-        var lineNo = lineNumber(at: charRange.location, ns)
+        var lineNo = lines.line(at: charRange.location)
         var lineStart = ns.lineRange(for: NSRange(location: charRange.location, length: 0)).location
         let end = NSMaxRange(charRange)
         while lineStart < ns.length, lineStart <= end {
@@ -80,12 +81,6 @@ final class LineNumberRuler: NSView {
         }
     }
 
-    // ponytail: O(n) newline count per draw. Cache line starts if a 5 MB file ever scrolls slowly.
-    private func lineNumber(at loc: Int, _ ns: NSString) -> Int {
-        var n = 1
-        for b in ns.substring(to: min(loc, ns.length)).utf8 where b == 10 { n += 1 }
-        return n
-    }
 
     private func draw(_ n: Int, y: CGFloat, current: Bool) {
         let attrs: [NSAttributedString.Key: Any] = [.font: font, .foregroundColor: current ? theme.accent : theme.muted]
