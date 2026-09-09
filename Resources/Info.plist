@@ -35,7 +35,7 @@
     <key>NSSupportsSuddenTermination</key>
     <false/>
     <key>NSHumanReadableCopyright</key>
-    <string>GPL-2.0-or-later</string>
+    <string>Copyright © 2026 Siddharth Rathod. MIT licensed.</string>
     <key>CFBundleDocumentTypes</key>
     <array>
         <dict>

@@ -213,4 +213,8 @@ Bump `CFBundleShortVersionString` in `Resources/Info.plist`, tag it, attach
 
 ## License
 
-GPL-2.0-or-later, matching the Xfce original this is modelled on.
+[MIT](LICENSE) — use it, fork it, ship it in something commercial, no permission needed.
+Contributions are accepted under the same license.
+
+This is an independent reimplementation, not a fork: it shares Xfce Mousepad's feature
+set and layout but none of its code, so none of its GPL terms carry over.
