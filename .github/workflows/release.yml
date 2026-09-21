@@ -1,0 +1,25 @@
+# Push a tag like v0.2.0 to build Mousepad.zip and attach it to a release.
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: ./Scripts/make-app.sh
+      - run: cd dist && ditto -c -k --keepParent --sequesterRsrc Mousepad.app Mousepad.zip
+      - run: echo "SHA=$(shasum -a 256 dist/Mousepad.zip | cut -d' ' -f1)" >> "$GITHUB_ENV"
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: dist/Mousepad.zip
+          body: |
+            Install with `brew install --cask code-zenx/mousepad/mousepad`.
+
+            SHA-256 for the cask: `${{ env.SHA }}`
